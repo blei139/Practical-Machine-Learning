@@ -1,0 +1,422 @@
+---
+title: "Practical Machine Learning course Project"
+author: "Bernard Lei"
+date: "June 1, 2016"
+output: html_document
+---
+
+##Introduction
+Using Jawbone Up, Nike FuelBand, and Fitbit, one can collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, the goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. For more information, go to this website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+##Synopsis
+Using the training data and test data available from online to predict the test data output, based on the training data.  The training data are available here:
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+The test data are available here:
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+The data for this project come from this source: http://groupware.les.inf.puc-rio.br/har. The main objective to find the best prediction method in R for classification output, using data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants.
+
+
+##Actual class specification
+Six young health participants were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions: exactly according to the specification (Class A), throwing the elbows to the front (Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway (Class D) and throwing the hips to the front (Class E).
+
+## Increase the size of the memory allocation
+```{r}
+memory.limit()
+
+memory.limit(size=9000)
+
+```
+
+##Load libraries
+```{r}
+library(caret)
+library(rattle)
+library(gridExtra)
+library(e1071)
+library(kknn)
+library(nnet)
+library(rpart)
+library(rpart.plot)
+```
+
+##Load the data sets
+```{r}
+pmltestdata <- read.csv("pml-testing.csv")
+pmltraindata <- read.csv("pml-training.csv")
+colnames(pmltestdata)
+```
+
+## find the columns has all NAs
+```{r}
+colnames(pmltestdata)[colSums(is.na(pmltestdata)) > 0]
+colnames(pmltraindata)[colSums(is.na(pmltraindata)) > 0]
+```
+
+## Clean up the training data
+## search for column name beginning with "roll"
+```{r}
+traindata_roll <- grepl("^roll", colnames(pmltraindata))
+rolldata <- pmltraindata[, traindata_roll]
+```
+
+## search for column name beginning with "pitch"
+```{r}
+traindata_pitch <- grepl("^pitch", colnames(pmltraindata))
+pitchdata <- pmltraindata[, traindata_pitch]
+```
+
+## search for column name beginning with "yaw"
+```{r}
+traindata_yaw <- grepl("^yaw", colnames(pmltraindata))
+yawdata <- pmltraindata[, traindata_yaw]
+```
+
+## search for column name beginning with "total"
+```{r}
+traindata_total <- grepl("^total", colnames(pmltraindata))
+totaldata <- pmltraindata[, traindata_total]
+```
+
+## search for column name beginning with "gyros"
+```{r}
+traindata_gyros <- grepl("^gyros", colnames(pmltraindata))
+gyrosdata <- pmltraindata[, traindata_gyros] 
+```
+
+## search for column name beginning with "accel"
+```{r}
+traindata_accel <- grepl("^accel", colnames(pmltraindata))
+acceldata <- pmltraindata[, traindata_accel]
+```
+
+## search for column name beginning with "magnet"
+```{r}
+traindata_magnet <- grepl("^magnet", colnames(pmltraindata))
+magnetdata <- pmltraindata[, traindata_magnet]
+```
+
+## search for column name beginning with "classe"
+```{r}
+traindata_classe <- grepl("^classe", colnames(pmltraindata))
+classedata <- pmltraindata[, traindata_classe]
+```
+
+## combine all the columns together
+```{r}
+traindata <- cbind(rolldata, pitchdata, yawdata, totaldata, gyrosdata, acceldata, magnetdata, classedata)
+```
+
+## Clean up the test data
+## search for column name beginning with "roll"
+```{r}
+testdata_roll <- grepl("^roll", colnames(pmltestdata))
+rolltdata <- pmltestdata[, testdata_roll]
+```
+
+## search for column name beginning with "pitch"
+```{r}
+testdata_pitch <- grepl("^pitch", colnames(pmltestdata))
+pitchtdata <- pmltestdata[, testdata_pitch]
+```
+
+## search for column name beginning with "yaw"
+```{r}
+testdata_yaw <- grepl("^yaw", colnames(pmltestdata))
+yawtdata <- pmltestdata[, testdata_yaw]
+```
+
+## search for column name beginning with "total"
+```{r}
+testdata_total <- grepl("^total", colnames(pmltestdata))
+totaltdata <- pmltestdata[, testdata_total]
+```
+
+## search for column name beginning with "gyros"
+```{r}
+testdata_gyros <- grepl("^gyros", colnames(pmltestdata))
+gyrostdata <- pmltestdata[, testdata_gyros] 
+```
+
+## search for column name beginning with "accel"
+```{r}
+testdata_accel <- grepl("^accel", colnames(pmltestdata))
+acceltdata <- pmltestdata[, testdata_accel]
+```
+
+## search for column name beginning with "magnet"
+```{r}
+testdata_magnet <- grepl("^magnet", colnames(pmltestdata))
+magnettdata <- pmltestdata[, testdata_magnet]
+```
+
+## search for column name beginning with "problem"
+```{r}
+testdata_problem <- grepl("^problem", colnames(pmltestdata))
+problemtdata <- pmltestdata[, testdata_problem]
+```
+
+## combine all the columns together
+```{r}
+testdata <- cbind(rolltdata, pitchtdata, yawtdata, totaltdata, gyrostdata, acceltdata, magnettdata, problemtdata)
+```
+
+ ## Visualize the data
+ ```{r}
+dataclass_vars <- traindata[, c(1, 2, 3, 4, 5, 6, 7)] 
+pairs(dataclass_vars, panel = panel.smooth, col = 16)
+```
+
+## Analysis:
+The data are not linear to the output labels at all, must use non-linear classification prediction methods.
+
+## Training subset data(training and cross validation purpose)
+Training subset data for training and cross validation 60% of the training subset data for training purpose and 40% for cross validation purpose.
+
+```{r}
+set.seed(333)
+inTrain = createDataPartition(traindata$classedata, p = .60)[[1]]
+trainingsubset = traindata[ inTrain,]
+testingsubset = traindata[-inTrain,]
+dim(trainingsubset)
+
+dim(testingsubset)
+
+dim(traindata)
+
+```
+
+## 1st method: random forest
+```{r}
+modelFit <- train(classedata ~ ., data=trainingsubset, method="rf", trControl=trainControl(method = "cv", number = 4), prox=TRUE)
+print(modelFit)
+```
+
+```{r}
+varImp(modelFit)
+```
+
+
+```{r}
+outputpredict=predict(modelFit,testingsubset)
+head(outputpredict)
+
+tail(outputpredict)
+
+```
+
+##Confusion matrix
+```{r}
+confusionMatrix(testingsubset$classedata,outputpredict)
+```
+
+
+```{r}
+cm1 <- confusionMatrix(testingsubset$classedata,outputpredict)
+cm1$overall['Accuracy']
+```
+ 
+## 2nd model: decision tree(rpart)
+```{r}
+modelFit2 <- rpart(classedata ~ ., method="class", data=trainingsubset)
+fancyRpartPlot(modelFit2)
+outputpredict2 <- predict(modelFit2, testingsubset, type = "class")
+confusionMatrix(testingsubset$classedata,outputpredict2)
+
+```
+
+```{r}
+cm2 <- confusionMatrix(testingsubset$classedata,outputpredict2)
+cm2$overall['Accuracy']
+```
+
+##3rd method: naive bayes
+```{r}
+modelFit3<-naiveBayes(classedata~.,data=trainingsubset)
+print(modelFit3)
+outputpredict3=predict(modelFit3,testingsubset)
+confusionMatrix(testingsubset$classedata,outputpredict3)
+```
+
+```{r}
+cm3 <- confusionMatrix(testingsubset$classedata,outputpredict3)
+cm3$overall['Accuracy']
+```
+
+
+##4th method: Nearest Neighbor
+```{r}
+training_kknn <- kknn(classedata ~ ., trainingsubset, testingsubset, distance = 1, kernel = "triangular")
+
+outputpredict4 <- fitted(training_kknn)
+
+```
+
+##confustion matrix
+```{r}
+table(testingsubset$classedata, outputpredict4)
+```
+
+```{r}
+confusionMatrix(testingsubset$classedata,outputpredict4)
+```
+
+
+```{r}
+cm4 <- confusionMatrix(testingsubset$classedata,outputpredict4)
+cm4$overall['Accuracy']
+```
+
+## 5th model neural network(deep learning nnet) 
+##Obtain the column names 
+```{r}
+cname <- colnames(trainingsubset)
+```
+
+## every column except the output column(classedata)
+```{r}
+cinput <-cname[!cname %in% "classedata"]
+f <- as.formula(paste(paste("as.numeric(classedata) ~ as.numeric(", paste(cinput, collapse = ") + as.numeric(")), ")"))
+```
+
+## only select all input columns 
+```{r}
+temp_test <- subset(testingsubset, select = c(cinput))
+temp_train <- subset(trainingsubset, select = c(cinput))
+```
+
+## Check if all columns are numeric or integer
+```{r}
+str(temp_test)
+str(temp_train)
+##See the temporary testing subset data
+head(temp_test)
+```
+
+## normalize function
+```{r}
+normalize <- function(x) {
+num <- x - min(x)
+denom <- max(x) - min(x)
+return (num/denom)
+}
+training_norm <- as.data.frame(lapply(temp_train, normalize))
+testing_norm <- as.data.frame(lapply(temp_test, normalize))
+
+summary(training_norm)
+```
+
+```{r}
+summary(testing_norm)
+head(training_norm)
+head(testing_norm)
+```
+
+```{r}
+colnames_classedata <- grepl("^classedata", colnames(trainingsubset))
+training_classedata <- trainingsubset[, colnames_classedata]
+training_norm <- cbind(training_norm, training_classedata)
+
+colnames_classedata <- grepl("^classedata", colnames(testingsubset))
+testing_classedata <- testingsubset[, colnames_classedata]
+testing_norm <- cbind(testing_norm, testing_classedata)
+```
+
+```{r}
+modelfit5 <- train(training_classedata ~ ., data=training_norm, method="nnet")
+
+print(modelfit5)
+```
+
+```{r}
+outputpredict5=predict(modelfit5,testing_norm) 
+confusionMatrix(testing_norm$testing_classedata,outputpredict5)
+```
+
+```{r}
+cm5 <- confusionMatrix(testing_norm$testing_classedata,outputpredict5)
+cm5$overall['Accuracy']
+```
+
+##6th model: SVM(e1071)
+```{r}
+svm_model <- svm(classedata ~ ., data=trainingsubset)
+summary(svm_model)
+```
+
+```{r}
+print(svm_model)
+```
+
+```{r}
+outputpredict6 <- predict(svm_model,testingsubset)
+head(outputpredict6)
+```
+
+```{r}
+system.time(outputpredict6 <- predict(svm_model, testingsubset))
+```
+
+```{r}
+table(outputpredict6,testingsubset$classedata)
+```
+
+```{r}
+confusionMatrix(testingsubset$classedata,outputpredict6)
+```
+
+
+```{r}
+cm6 <- confusionMatrix(testingsubset$classedata,outputpredict6)
+cm6$overall['Accuracy']
+```
+
+##Accuracy Summary of Methods
+```{r}
+cmtable <- cbind(cm1$overall['Accuracy'], cm2$overall['Accuracy'], cm3$overall['Accuracy'], cm4$overall['Accuracy'], cm5$overall['Accuracy'], cm6$overall['Accuracy'])
+colnames(cmtable) <- c("RandomForest", "DecisionTree", "NaiveBayes", "NearestNeighbor", "NeuralNetwork", "SVM")
+print(cmtable)
+```
+
+##maximum accuracy
+```{r}
+max(cmtable)
+```
+
+##minimum accuracy
+```{r}
+min(cmtable)
+```
+
+## Ranking of accuracy of methods
+```{r}
+cmrank <- cmtable[order(cmtable, decreasing = TRUE)]
+print(cmrank)
+```
+
+##Analysis:
+The best model is ranom forest algorithm.
+
+##Best model(Random Forest) output submission
+```{r}
+cm1errorrate <- 1 - as.numeric(cm1$overall['Accuracy'])
+print(cm1errorrate)
+```
+
+```{r}
+outputpredict=predict(modelFit,testdata)
+testdata$classe <- outputpredict
+head(testdata$classe)
+```
+
+```{r}
+submit <- data.frame(problem_id = testdata$problemtdata, classe = outputpredict)
+head(submit)
+```
+
+##Write the testing output prediction to a file
+```{r}
+write.csv(submit, file = "practicalMLsubmit.csv", row.names = FALSE)
+```
+
+##Conclusion:
+It is obvious the best prediction algorithm with the highest accuracy rate is the random forest algorithm.  The second best prediction algorithm is the nearest neighbor algorithm. The third best prediction algorithm is the SVM algorithm.  The testing dataset output predictions are submitted to a csv file.
